@@ -344,7 +344,7 @@ Init Cpio configuration
 $ vim /etc/mkinitcpio.conf
 # and set/replace
 MODULES=(ext4)
-HOOKS="base udev autodetect microcode modconf kms keyboard keymap consolefont block encrypt lvm2 filesystems fsck"
+HOOKS="base udev autodetect microcode modconf kms keyboard keymap consolefont block encrypt lvm2 filesystems resume fsck"
 ```
 - keyboard: before encrypt, to be able to use the keyboard to type key before decryption
 - keymap: to load the german layout
@@ -666,9 +666,9 @@ https://wiki.archlinux.org/index.php/GRUB#Warning_when_installing_in_chroot
 
 
 ### efivars/efivarfs
-https://unix.stackexchange.com/questions/91620/efi-variables-are-not-supported-on-this-system
-https://bbs.archlinux.org/viewtopic.php?id=172867
-https://wiki.archlinux.org/index.php/Unified_Extensible_Firmware_Interface#Mount_efivarfs
+https://unix.stackexchange.com/questions/91620/efi-variables-are-not-supported-on-this-system  
+https://bbs.archlinux.org/viewtopic.php?id=172867  
+https://wiki.archlinux.org/index.php/Unified_Extensible_Firmware_Interface#Mount_efivarfs  
 
 
 
@@ -689,6 +689,7 @@ $ reboot
 
 #### Missing Modules
 https://www.linux.org/threads/understanding-the-various-grub-modules.11142/
+
 If password invalid maybe some modules are missing
 ```
 grub> insmod <modulename>
@@ -718,7 +719,7 @@ grub> normal
 
 Failed to start file system check on /dev/disk/by-uuid
 
-get full error in emergency shell
+Get full error in emergency shell
 ```
 uuid= 06618d7a-0b70-4ccd-9953-d5deae8c8e009
 systemctl status --no-pager --full systemd-fsck@dev-disk-by\\x2duuid-06618d7a\\x2d0b70\\x2d4ccd\\x2d9953\\x2d5deae8c8e009.service
@@ -728,7 +729,7 @@ fsck -v /dev/sdXx
 ```
 
 ### Battery
-check capacity in terminal
+Check capacity in terminal
 ```
 $ cat /sys/class/power_supply/BAT0/capacity
 ```
