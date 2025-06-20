@@ -92,5 +92,7 @@ $ vim /etc/vconsole.conf
 In case of utf-8 icons are not displayed propperly, 
   one of the following fonts could help
 ```
-$pacman -S ttf-dejavu gnu-free-fonts ttf-font-awesome
+$pacman -S ttf-dejavu 
+$pacman -S gnu-free-fonts
+$pacman -S ttf-font-awesome
 ```
