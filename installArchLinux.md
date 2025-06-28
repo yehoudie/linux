@@ -344,15 +344,30 @@ Init Cpio configuration
 $ vim /etc/mkinitcpio.conf
 # and set/replace
 MODULES=(ext4)
-HOOKS="base udev autodetect microcode modconf kms keyboard keymap consolefont block encrypt lvm2 filesystems resume fsck"
+# busy box init
+HOOKS="base udev keyboard autodetect microcode modconf kms keymap consolefont block encrypt lvm2 filesystems resume fsck"
+# or systemd init
+HOOKS="systemd keyboard autodetect microcode modconf kms sd-vconsole block sd-encrypt lvm2 filesystems resume fsck"
 ```
-- keyboard: before encrypt, to be able to use the keyboard to type key before decryption
-- keymap: to load the german layout
-- lvm2: before filesystem, because they are managed with lvm
+- autodetect: Shrinks your initramfs to a smaller size by creating a whitelist of modules from a scan of sysfs.
+- microcode: Prepends an uncompressed initramfs image with early microcode update files for Intel and AMD processors. 
+- modconf: Includes modprobe configuration files from `/etc/modprobe.d/` and `/usr/lib/modprobe.d/`
+- kms: Adds GPU modules to provide early KMS start. 
+- keyboard: Adds the necessary modules for (USB) keyboard devices. Before encrypt, to be able to use the keyboard to type key before decryption
+- keymap: Adds the specified console keymap(s) from `/etc/vconsole.conf` to the initramfs.
+- consolefont: Adds the specified console font from `/etc/vconsole.conf` to the initramfs.
+- sd-vconsole: Equal to `keymap` and `consolefont`.
+- block: Adds block device modules. If the autodetect hook runs before this hook, it will only add modules for block devices used on the system. Exceptions are the /`ahci/`, /`sd_mod/`, /`usb_storage/`, /`uas/`, /`mmc_block/`, /`nvme/`, /`virtio_scsi/` and /`virtio_blk/` modules which will always be added unconditionally.
+- [sd-]encrypt: Adds the dm_crypt kernel module and the cryptsetup tool to the image. 
+- lvm2: Adds the device mapper kernel module and the lvm tool to the image. Before `filesystem`, because they are managed with lvm.
+- filesystem: This includes necessary file system modules into your image. This hook is required unless you specify your file system modules in `MODULES`.
+- fsck: Adds the fsck binary and file system-specific helpers to allow running fsck against your root device (and `/usr` if separate) prior to mounting.
 - add "resume" for hibernation, if needed
 - add "numlock" to enable num lock as early as possible. 
   Got an error when building: Not found!!
   So I skipped this.
+
+It is said that systemd init runs (a little bit) faster but other than that I couldn't figure out much of a differece.
 
 Regenerate initrd image
 ```
@@ -363,6 +378,7 @@ If you got warnings about missing firmware for wd719x and aic94xx, etc
   you can ignore it, if you don't have it.
 You should install it from AUR if you actually use it.
 
+https://wiki.archlinux.org/title/Mkinitcpio
 
 
 

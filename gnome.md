@@ -7,6 +7,7 @@ $ pacman -S gnome
 $ pacmn -S gnome-tweaks
 ```
 
+### Components
 https://github.com/GNOME/...
 - [Baobab](https://github.com/GNOME/baobab): 
     Gnome disk usage analyzer
@@ -96,3 +97,15 @@ $pacman -S ttf-dejavu
 $pacman -S gnu-free-fonts
 $pacman -S ttf-font-awesome
 ```
+
+## fractional scaling
+$ gsettings set org.gnome.mutter experimental-features "['scale-monitor-framebuffer']"
+$ reboot
+
+## open new windows in front
+gsettings set org.gnome.desktop.wm.preferences auto-raise 'true'
+gsettings set org.gnome.desktop.wm.preferences focus-new-windows 'smart'
+
+
+## folder view
+gsettings set org.gnome.nautilus.preferences default-folder-viewer 'list-view'
