@@ -74,7 +74,7 @@ Guide to install archlinux with full disk encryption and encrypted boot loader.
 On an SSD, instead of ext4, f2fs may be used for better performance, less journaling.
 
 `/boot` is not required to be kept in a separate partition.
-It may also be placed in the volume group of Linux LVM.
+It may also be placed in the volume group of Linux LVM or not separated at all directly in root.
 
 
 ## Download 
@@ -101,7 +101,7 @@ Secure boot will not work by default and has to be disabled!
 
 ## Wiping
 
-If needed securely wipe drive according this [article](https://wiki.archlinux.org/index.php/Dm-crypt/Drive_preparation).
+If needed securely wipe your drive according to this [article](https://wiki.archlinux.org/index.php/Dm-crypt/Drive_preparation).
 But the step may be skipped because your partition gets encrypted anyway and it stresses the SSD.
 
 
@@ -109,14 +109,14 @@ But the step may be skipped because your partition gets encrypted anyway and it 
 
 ### Keyboard layout
 If required, load another keyboard layout of your choice,
-  like german layout:
+  like the german layout:
 ```
 $ loadkeys de
 ```
 
 ### Connect to Wi-Fi
 
-Skip this if you have wired connection.
+Skip this if you have a wired connection.
 Just use LAN.
 
 ```
@@ -160,14 +160,22 @@ Using `gdisk`
 #    1            2048         1050623   1024.0 MiB  EF00  EFI System
 #    2         1050624         1460223   1024.0 MiB  8300  Linux filesystem
 #    3         1460224      1679181823   800.0 GiB   8E00  Linux LVM
+
+# Number  Start (sector)    End (sector)  Size       Code  Name
+#    1            2048          526335    512.0 MiB  EF00  EFI System
+#    2          526336          935935   1024.0 MiB  8300  Linux filesystem
+#    3          935936      1679181823    800.0 GiB  8E00  Linux LVM
 # "w" to write changes
 # "q" to quit
 ```
 
-So the EFI and boot partition got 1GB each, the linux partition got the rest.
+So the EFI got 512 MB and boot partition got 1GB, the linux partition got the rest.
 
-For the first two, 512MB may be enough.
-Depending on the number of kernels and or dual boot setup, update frequency, 1GB is the better choice for boot.
+For EFI, 256MB might be enough.
+
+ArchLinux stores the (different) kernels, vmlinuz and initramfs under /boot.
+Depending on the number of kernels and or dual boot setup, update frequency, 1GB is a good choice for boot.
+(If not kept on a separate partition but directly under root, the problem to have not enough space in boot does not occur.)
 
 
 ### Initialize partitions
@@ -185,7 +193,7 @@ But usually it should be
 
 
 Make filesystem for EFI. 
-Commonly it's formated FAT32.
+Commonly it's formatted FAT32.
 ```
 $ mkfs.fat -F32 /dev/sda1
 ```
@@ -220,24 +228,17 @@ $ mkfs.ext4 /dev/mapper/vg0-root
 $ mkswap /dev/mapper/vg0-swap
 ```
 
-Alternativly you could put root and home in different logical volumes:
-```
-lvcreate -L 200GB -n root vg0
-lvcreate -l 100%FREE -n home vg0
-mkfs.ext4 /dev/mapper/vg0-root
-mkfs.ext4 /dev/mapper/vg0-home
-```
-
+Size of swap space should be in order of your RAM.
 
 ### Mount
 
 ```
 $ swapon /dev/mapper/vg0-swap
 $ mount /dev/mapper/vg0-root /mnt
-    [$ mkdir /mnt/home
-    $ mount /dev/mapper/vg0-home /mnt/home]
+
 $ mkdir /mnt/boot
 $ mount /dev/mapper/cryptboot /mnt/boot
+
 $ mkdir /mnt/boot/efi
 $ mount /dev/sda1 /mnt/boot/efi
 ```
@@ -260,7 +261,6 @@ You will have something like this:
 # | +-cryptlvm   254:1    0   800G  0 crypt
 # |   +-vg0-swap 254:2    0    16G  0 lvm   SWAP
 # |   +-vg0-root 254:3    0   784G  0 lvm   /mnt
-[# |   +-vg0-root 254:3    0   784G  0 lvm   /mnt/home]
 # +-sda1           8:1    0   512M  0 part  /mnt/boot/efi
 ```
 
@@ -367,7 +367,7 @@ HOOKS="systemd keyboard autodetect microcode modconf kms sd-vconsole block sd-en
   Got an error when building: Not found!!
   So I skipped this.
 
-It is said that systemd init runs (a little bit) faster but other than that I couldn't figure out much of a differece.
+It is said that systemd init runs (a little bit) faster but other than that I couldn't figure out much of a difference.
 
 Regenerate initrd image
 ```
@@ -394,15 +394,8 @@ Change grub config.
         `crypto=sha512:aes-xts-plain64:512:0:`
 
 ```
-echo "GRUB_ENABLE_CRYPTODISK=y" >> /etc/default/grub
-sed -i "s#^GRUB_CMDLINE_LINUX=.*#GRUB_CMDLINE_LINUX=\"cryptdevice=UUID=$(blkid /dev/sda3 -s UUID -o value):lvm resume=/dev/mapper/vg0-swap\"#g" /etc/default/grub
-```
-or
-```
 $ vim /etc/default/grub
-```
-search
-```
+------------------------
 GRUB_ENABLE_CRYPTODISK=y
 GRUB_CMDLINE_LINUX_DEFAULT="... intel_iommu=on"
 
@@ -417,6 +410,7 @@ GRUB_CMDLINE_LINUX="cryptdevice=UUID=<root_uuid>:cryptlvm resume=/dev/mapper/vg0
 GRUB_PRELOAD_MODULES="part_gpt part_msdos gcry_sha512"
 # GRUB_PRELOAD_MODULES="part_gpt part_msdos gcry_sha512 luks cryptodisk lvm ext2"
 ```
+
 `root=...` seems not to be needed, since it occurs twice `/proc/cmdline` if added here.
 Unsure if this causes problems.
 
@@ -430,7 +424,7 @@ $ blkid /dev/sda3 -s UUID
 $ blkid -o +UUID
 ```
 
-Optionally do this for a nicer grub menu layout
+Optionally add this for a nicer grub menu layout
 ```
 GRUB_DISABLE_SUBMENU=y
 GRUB_DEFAULT=saved
@@ -452,7 +446,8 @@ $ grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=Arc
 $ mkdir /boot/efi/EFI/boot
 $ cp /boot/efi/EFI/ArchLinux/grubx64.efi /boot/efi/EFI/boot/bootx64.efi
 ```
-I experience issues when booting, getting the prompt for a password to display (errors regarding cryptouuid, cryptodisk, or "device not found").
+
+I experienced issues when booting, getting the prompt for a password to display (errors regarding cryptouuid, cryptodisk, or "device not found").
 I appended `--modules="part_gpt part_msdos gcry_sha512` to the end of your grub-install command.
 This fixed the issues.
 Just `gcry_sha512` may have been enough, though.
@@ -463,6 +458,7 @@ Just `gcry_sha512` may have been enough, though.
 Edit crypttab and add boot uuid
 ```
 $ vim /etc/crypttab
+-------------------
 # add a line
 1> cryptboot /dev/sda2 none luks
 or
@@ -493,6 +489,7 @@ $ cryptsetup luksAddKey --pbkdf pbkdf2 --hash=512 /dev/sda2 /etc/key
 add/replace it in crypttab
 ```
 $ vim /etc/crypttab
+-------------------
 1> cryptboot /dev/sda2 /etc/key luks[,discard,key-slot=1]
 or
 1> cryptboot UUID=<uuidOfSda2> /etc/key luks[,discard,key-slot=1]
@@ -500,7 +497,7 @@ or
 
 Key slot is added manually to reduce boot time. 
 Otherwise, all slots would be checked for a key.
-Should be 1 but can be confirmed by checking
+It should be 1 but can be confirmed by checking
 ```
 $ cryptsetup luksDump /dev/sda2"
 ```
@@ -520,9 +517,12 @@ Update mkinitcpio.conf
 sed -i 's\^FILES=.*\FILES="/crypto_keyfile.bin"\g' /etc/mkinitcpio.conf
 # or
 vim /etc/mkinitcpio.conf
+------------------------
 # replace/set
-vim> FILES="/crypto_keyfile.bin"
+FILES="/crypto_keyfile.bin"
+```
 
+```
 # update
 $ mkinitcpio -p linux
 ```
@@ -532,7 +532,8 @@ Update grub
   but if it doesn't work or you have chosen a different name
 ```
 $ vim /etc/default/grub
-vim> GRUB_CMDLINE_LINUX="... cryptkey=rootfs:/crypto_keyfile.bin"
+-----------------------
+GRUB_CMDLINE_LINUX="... cryptkey=rootfs:/crypto_keyfile.bin"
 $ grub-mkconfig -o /boot/grub/grub.cfg
 ```
 
@@ -544,7 +545,7 @@ On Intel machines enable Intel microcode CPU updates
 ```
 $ pacman -S intel-ucode
 ```
-
+On AMD `amd-ucode` is needed.
 
 
 ### Some additional security
@@ -560,12 +561,18 @@ Create non-root user, set password
 ```
 $ useradd -m -g users -G wheel <username>
 $ passwd <username>
-
-# Open file
-$ vim /etc/sudoers
-# and uncomment string 
-vim> %wheel ALL=(ALL) ALL
 ```
+
+Open file
+```
+$ vim /etc/sudoers
+------------------
+# and uncomment string 
+%wheel ALL=(ALL) ALL
+```
+
+https://wiki.archlinux.org/title/Sudo
+
 
 
 ### Internet
@@ -586,7 +593,9 @@ So you may don't want to use it and manually add the other system.
 (untested)
 ```
 $ pacman -S os-prober
+
 $ vim /etc/default/grub
+-----------------------
 # add/comment line
 GRUB_DISABLE_OS_PROBER=false
 
@@ -613,7 +622,8 @@ $ grub-mkconfig -o /boot/grub/grub.cfg
 
 ## Finish
 
-Exit from chroot, unmount system, shutdown, extract flash stick. You made it! Now you have fully encrypted system.
+Exit from chroot, unmount system, shutdown, extract flash stick. 
+Now you have a fully encrypted system.
 $ exit
 $ umount -R /mnt
 $ swapoff -a
@@ -648,7 +658,7 @@ Choose DIFFERENT password from that you used for encryption, because some lazy m
 
 ### Temp Device
 ```
-# $ vim /etc/fstab
+$ vim /etc/fstab
 # add line
 > tempfs  /home/{username}/temp   tempfs  mode=0777,noatime   0   0
 ```
@@ -744,6 +754,7 @@ fsck -f /dev/sda2
 fsck -v /dev/sdXx
 ```
 
+
 ### Battery
 Check capacity in terminal
 ```
@@ -761,14 +772,14 @@ If the system does not boot,
   you can always try to recover it by booting in with an archlinux installation medium.
 
 Boot with arch linux usb.  
-To find out device layout, type:
+To find out the device layout, type:
 ```
 $ fdisk -l
 or
 $ lsblk
 ```
 
-In this case encrypted boot is sda2 and lvm is sda3:
+In this example encrypted boot is sda2 and lvm is sda3:
 ```
 # cryptsetup <cmd> <device> <name>
 $ cryptsetup open /dev/sda2 cryptboot
@@ -790,6 +801,10 @@ $ umount -R /mnt
 [$ cryptsetup close cryptboot]
 $ poweroff
 ```
+
+For a longer debug cycle it may be convenient to put this lines into a script on a separate usb stick.
+Just add a `pause` between the cryptsetup and mounting.
+
 
 ## Keys
 Change pw in slot 0
@@ -831,6 +846,7 @@ lvdisplay
 lvresize --size [+|-]LogicalVolumeSize[bBsSkKmMgGtTpPeE] [--resizefs] <lvname>
 ```
 If the logical volume is formatted ext4 for example, `--resizefs` is required to resize the underlying filesystem.
+`<lvname>` is combination of `<vgname>/<lvname>`
 
 https://linux.die.net/man/8/lvresize
 
@@ -841,6 +857,57 @@ Just install the kernel of your choice and regenerate grub config.
 ```
 $ pacman -S linux-hardened
 $ grub-mkconfig -o /boot/grub/grub.cfg
+```
+
+## Finding Modules
+Finding needed modules
+
+The quickest way to find out what modules you need is to reboot your system with the fallback initramfs image and add break=postmount to the kernel parameters in your boot loader so you get dropped to the command line once the root filesystem is mounted.
+
+Once your system reboots, run the following command to see what modules you need:
+```
+$ lsmod | awk 'NF==3{print $1}'
+```
+
+
+## Partitioning and mounting alternatives
+
+### root and home
+You could put root and home in different logical volumes:
+```
+lvcreate -L 200GB -n root vg0
+lvcreate -l 100%FREE -n home vg0
+mkfs.ext4 /dev/mapper/vg0-root
+mkfs.ext4 /dev/mapper/vg0-home
+```
+
+```
+$ swapon /dev/mapper/vg0-swap
+$ mount /dev/mapper/vg0-root /mnt
+$ mkdir /mnt/home
+$ mount /dev/mapper/vg0-home /mnt/home
+$ mkdir /mnt/boot
+$ mount /dev/mapper/cryptboot /mnt/boot
+$ mkdir /mnt/boot/efi
+$ mount /dev/sda1 /mnt/boot/efi
+```
+
+
+## EFI in it's own folder
+EFI does not have to be under /boot, it can be in another folder like /efi as well.
+```
+$ mkdir /mnt/efi
+$ mount /dev/sda1 /mnt/efi
+
+...
+
+$ genfstab -pU /mnt >> /mnt/etc/fstab
+
+...
+$ arch-chroot /mnt
+...
+
+$ grub-install ... --efi-directory /efi
 ```
 
 
